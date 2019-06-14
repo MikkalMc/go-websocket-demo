@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -16,18 +19,12 @@ func main() {
 	http.HandleFunc("/echo", func(w http.ResponseWriter, r *http.Request) {
 		conn, _ := upgrader.Upgrade(w, r, nil)
 
-		for {
-			// Read message from browser
-			msgType, msg, err := conn.ReadMessage()
-			if err != nil {
-				return
-			}
-			fmt.Printf("%s sent: %s\n", conn.RemoteAddr(), string(msg))
+		//listen and write
+		go readWriteRoutine(conn)
 
-			if err = conn.WriteMessage(msgType, msg); err != nil {
-				return
-			}
-		}
+		//fake a data stream
+		go fakeStream(conn)
+
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -36,4 +33,29 @@ func main() {
 
 	fmt.Println("running on port 8080")
 	http.ListenAndServe(":8080", nil)
+}
+
+func readWriteRoutine(conn *websocket.Conn) {
+	// Read message from browser
+	for {
+		msgType, msg, err := conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		fmt.Printf("%s sent: %s\n", conn.RemoteAddr(), string(msg))
+
+		if err = conn.WriteMessage(msgType, msg); err != nil {
+			return
+		}
+	}
+}
+
+func fakeStream(conn *websocket.Conn) {
+	for {
+		time.Sleep(5000 * time.Millisecond)
+		msg, err := json.Marshal(rand.Int())
+		if err = conn.WriteMessage(1, msg); err != nil {
+			return
+		}
+	}
 }
